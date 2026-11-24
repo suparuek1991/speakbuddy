@@ -99,8 +99,10 @@ function pickVoice(){const vs=speechSynthesis.getVoices().filter(v=>/^en[-_]US/i
  if(!voice)voice=vs[0]||speechSynthesis.getVoices().find(v=>/^en/i.test(v.lang))||null}
 if('speechSynthesis' in window){speechSynthesis.onvoiceschanged=pickVoice;pickVoice()}
 function say(text,slow){return new Promise(res=>{if(!('speechSynthesis' in window))return res();
- speechSynthesis.cancel();const u=new SpeechSynthesisUtterance(text);u.lang='en-US';if(voice)u.voice=voice;
- u.rate=slow?Math.max(.45,S.cfg.rate-.3):S.cfg.rate;u.onend=res;u.onerror=res;speechSynthesis.speak(u)})}
+ try{speechSynthesis.cancel();speechSynthesis.resume()}catch(e){}
+ if(!voice)pickVoice();
+ setTimeout(()=>{const u=new SpeechSynthesisUtterance(text);u.lang='en-US';if(voice)u.voice=voice;
+  u.rate=slow?Math.max(.45,S.cfg.rate-.3):S.cfg.rate;u.volume=1;u.onend=res;u.onerror=res;speechSynthesis.speak(u)},80)})}
 function unlockTTS(){try{const u=new SpeechSynthesisUtterance(' ');u.volume=0;speechSynthesis.speak(u)}catch(e){}}
 
 /* ========== อัดเสียง → WAV 16k ========== */
@@ -125,17 +127,28 @@ async function toWav(blob){
  return new Blob([w.buffer],{type:'audio/wav'})}
 function b64(blob){return new Promise(r=>{const f=new FileReader();f.onload=()=>r(String(f.result).split(',')[1]);f.readAsDataURL(blob)})}
 async function audioPart(blob){let b=blob,mt=(blob.type||'audio/mp4').split(';')[0];
- try{b=await toWav(blob);mt='audio/wav'}catch(e){}
+ try{b=await Promise.race([toWav(blob),new Promise((_,no)=>setTimeout(()=>no(new Error('wav timeout')),6000))]);mt='audio/wav'}catch(e){b=blob;mt=(blob.type||'audio/mp4').split(';')[0]}
  return {inlineData:{mimeType:mt,data:await b64(b)}}}
+function setMst(h){const e=document.querySelector('#mst');if(e)e.innerHTML=h}
 
 /* ========== Gemini ========== */
+const FALLBACK='gemini-3.5-flash-lite';
+async function callGem(model,system,contents){
+ const url='https://generativelanguage.googleapis.com/v1beta/models/'+encodeURIComponent(model)+':generateContent?key='+encodeURIComponent(S.cfg.key);
+ const ac=new AbortController();const tm=setTimeout(()=>ac.abort(),20000);let r;
+ try{r=await fetch(url,{method:'POST',signal:ac.signal,headers:{'Content-Type':'application/json'},body:JSON.stringify({
+  systemInstruction:{parts:[{text:system}]},contents,generationConfig:{responseMimeType:'application/json',temperature:0.5}})})}
+ catch(e){clearTimeout(tm);throw new Error(e.name==='AbortError'?'AI ตอบช้าเกิน 20 วินาที กดไมค์ลองใหม่อีกครั้ง':'เชื่อมต่ออินเทอร์เน็ตไม่ได้ ตรวจสัญญาณแล้วลองใหม่')}
+ clearTimeout(tm);
+ let j={};try{j=await r.json()}catch(e){}
+ return {r,j}}
 async function gem(system,contents){
  if(!S.cfg.key)throw new Error('ยังไม่ได้ใส่ API key — ไปที่แท็บ ⚙️ ตั้งค่า');
- const url='https://generativelanguage.googleapis.com/v1beta/models/'+encodeURIComponent(S.cfg.model)+':generateContent?key='+encodeURIComponent(S.cfg.key);
- const r=await fetch(url,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({
-  systemInstruction:{parts:[{text:system}]},contents,generationConfig:{responseMimeType:'application/json',temperature:0.5}})});
- const j=await r.json();
- if(!r.ok){const m=(j.error&&j.error.message)||('HTTP '+r.status);throw new Error(r.status===429?'ใช้โควตาครบแล้ว ลองเปลี่ยนเป็นรุ่น flash-lite ในตั้งค่า ('+m+')':m)}
+ let {r,j}=await callGem(S.cfg.model,system,contents);
+ const busy=x=>[429,500,503,504].includes(x.status);
+ if(!r.ok&&busy(r)){await new Promise(z=>setTimeout(z,1200));({r,j}=await callGem(S.cfg.model,system,contents))}
+ if(!r.ok&&busy(r)&&S.cfg.model!==FALLBACK){({r,j}=await callGem(FALLBACK,system,contents))}
+ if(!r.ok){const m=(j.error&&j.error.message)||('HTTP '+r.status);throw new Error(r.status===429?'ใช้โควตาครบแล้ว รอสักครู่แล้วลองใหม่ ('+m+')':(r.status===503?'เซิร์ฟเวอร์ Gemini คนใช้เยอะ ลองอีกครั้งใน 1-2 นาที':m))}
  const t=(j.candidates&&j.candidates[0]&&j.candidates[0].content&&j.candidates[0].content.parts||[]).map(p=>p.text||'').join('');
  try{return JSON.parse(t.replace(/^```json\s*|```$/g,'').trim())}catch(e){throw new Error('AI ตอบรูปแบบผิด ลองใหม่อีกครั้ง')}}
 
@@ -143,7 +156,9 @@ const SYS_DRILL=`You are a kind English pronunciation coach for a Thai beginner.
 Return JSON: {"heard":"what the learner actually said, in English words as heard","score":0-100 integer for how close it is to the target (meaning and clear words matter more than accent),"ok":true if score>=70,"tip_th":"ONE short tip in Thai (max 25 words) about the single most important word to fix, or praise if ok"}.
 If the audio is silent or unclear, score 0 and ask to try again in tip_th.`;
 async function judge(target,blob){
+ setMst('<span class="spin"></span>กำลังแปลงเสียง…');
  const p=await audioPart(blob);
+ setMst('<span class="spin"></span>AI กำลังตรวจ…');
  return gem(SYS_DRILL,[{role:'user',parts:[{text:'TARGET: '+target},p]}])}
 
 function sysChat(lv){return `You are "Teacher Emma", a warm, patient native English speaker teaching a Thai adult beginner, one-to-one, by voice.
