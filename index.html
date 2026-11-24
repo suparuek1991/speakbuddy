@@ -1,0 +1,277 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,user-scalable=no">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="SpeakBuddy">
+<meta name="theme-color" content="#2f6fed">
+<link rel="manifest" href="manifest.json">
+<link rel="apple-touch-icon" href="icon-180.png">
+<title>SpeakBuddy</title>
+<style>
+:root{--b:#2f6fed;--bg:#f4f6fb;--c:#fff;--t:#1d2433;--m:#6b7488;--ok:#1f9d55;--bad:#d64545;--warn:#fff4d6;--r:16px}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{margin:0;height:100%;background:var(--bg);color:var(--t);font-family:-apple-system,"Sukhumvit Set","Thonburi",system-ui,sans-serif;font-size:16px}
+#app{display:flex;flex-direction:column;height:100%;max-width:640px;margin:0 auto}
+header{padding:calc(env(safe-area-inset-top) + 10px) 16px 10px;background:var(--c);border-bottom:1px solid #e3e7f0;font-weight:700;font-size:18px;display:flex;justify-content:space-between;align-items:center}
+header small{font-weight:400;color:var(--m);font-size:13px}
+main{flex:1;overflow-y:auto;padding:14px;-webkit-overflow-scrolling:touch}
+nav{display:flex;background:var(--c);border-top:1px solid #e3e7f0;padding-bottom:env(safe-area-inset-bottom)}
+nav button{flex:1;border:0;background:none;padding:9px 0 7px;font-size:11px;color:var(--m)}
+nav button span{display:block;font-size:22px}
+nav button.on{color:var(--b);font-weight:700}
+.card{background:var(--c);border-radius:var(--r);padding:14px;margin-bottom:12px;box-shadow:0 1px 3px rgba(20,30,60,.07)}
+.lv{display:flex;align-items:center;gap:12px;cursor:pointer}
+.lv .n{width:42px;height:42px;border-radius:50%;background:var(--b);color:#fff;display:flex;align-items:center;justify-content:center;font-weight:700;flex:none}
+.lv .d{color:var(--m);font-size:13px}
+.lv .st{margin-left:auto;font-size:13px;color:var(--ok)}
+.big{font-size:24px;font-weight:700;line-height:1.35}
+.th{color:var(--m);margin-top:4px}
+.row{display:flex;gap:8px;flex-wrap:wrap;margin-top:12px}
+button.btn{border:0;border-radius:12px;padding:11px 16px;font-size:15px;background:#e8eefc;color:var(--b);font-weight:600}
+button.pri{background:var(--b);color:#fff}
+button.ok{background:var(--ok);color:#fff}
+button.bad{background:#fde8e8;color:var(--bad)}
+button.btn:disabled{opacity:.5}
+.mic{width:84px;height:84px;border-radius:50%;border:0;background:var(--b);color:#fff;font-size:34px;box-shadow:0 4px 14px rgba(47,111,237,.4)}
+.mic.rec{background:var(--bad);animation:p 1s infinite}
+@keyframes p{50%{transform:scale(1.07)}}
+.center{text-align:center}
+.bub{max-width:86%;padding:10px 13px;border-radius:16px;margin:8px 0;line-height:1.4;white-space:pre-wrap}
+.bub.t{background:var(--c);border-bottom-left-radius:4px;box-shadow:0 1px 3px rgba(20,30,60,.07)}
+.bub.u{background:var(--b);color:#fff;margin-left:auto;border-bottom-right-radius:4px}
+.fix{background:var(--warn);border-radius:12px;padding:10px 12px;margin:4px 0 8px;font-size:14px;max-width:92%}
+.fix b{display:block}
+.hint{color:var(--m);font-size:14px;margin:2px 0 8px}
+.res{margin-top:12px;padding:12px;border-radius:12px;background:#f1f4fa}
+.res.good{background:#e6f6ec}.res.no{background:#fdeeee}
+select,input[type=text],input[type=password],textarea{width:100%;padding:11px;border:1px solid #d5dbe8;border-radius:10px;font-size:16px;background:#fff}
+label{display:block;margin:12px 0 5px;font-weight:600;font-size:14px}
+.bar{display:flex;gap:8px;padding:8px 14px calc(8px + 0px);background:var(--c);border-top:1px solid #e3e7f0;align-items:center}
+.bar input{flex:1}
+.back{background:none;border:0;color:var(--b);font-size:15px;padding:0 0 10px;font-weight:600}
+.pill{display:inline-block;background:#eef2fb;border-radius:20px;padding:3px 10px;font-size:12px;color:var(--m);margin-right:6px}
+.err{color:var(--bad);font-size:14px;margin-top:8px}
+.spin{display:inline-block;width:16px;height:16px;border:2px solid #cfd8ee;border-top-color:var(--b);border-radius:50%;animation:s .8s linear infinite;vertical-align:-3px;margin-right:6px}
+@keyframes s{to{transform:rotate(360deg)}}
+</style>
+</head>
+<body>
+<div id="app">
+  <header><div>SpeakBuddy 🎓 <small id="sub"></small></div><span id="streak"></span></header>
+  <main id="main"></main>
+  <div id="bar"></div>
+  <nav id="nav"></nav>
+</div>
+<script>
+/* ========== ข้อมูลบทเรียน ========== */
+const LEVELS=[
+ {id:1,icon:"👋",name:"แนะนำตัว",scene:"Meeting a new friend for the first time. Ask simple questions: name, job, where they live, hobbies.",
+  items:[["I am {name}.","ฉันชื่อ {name}"],["I work at the railway.","ฉันทำงานที่การรถไฟ"],["I like trains.","ฉันชอบรถไฟ"],["I live in Ayutthaya.","ฉันอยู่ที่อยุธยา"]]},
+ {id:2,icon:"☕",name:"กินและซื้อของ",scene:"A customer ordering food and drinks at a small cafe, asking prices and asking for the bill. You are the cafe staff.",
+  items:[["Can I have a coffee, please?","ขอกาแฟหนึ่งแก้วครับ"],["How much is this?","อันนี้ราคาเท่าไหร่"],["I'd like fried rice.","ผมขอข้าวผัดครับ"],["The bill, please.","ขอบิลด้วยครับ"]]},
+ {id:3,icon:"🚆",name:"เดินทาง",scene:"A traveler at a train station asking for directions, tickets and a hotel reservation. You are station or hotel staff.",
+  items:[["Where is the station?","สถานีอยู่ที่ไหน"],["How do I get to Tokyo?","ไปโตเกียวยังไง"],["I have a reservation.","ผมมีการจองไว้แล้ว"],["One ticket to Nagoya, please.","ขอตั๋วไปนาโกย่าหนึ่งใบ"]]},
+ {id:4,icon:"📅",name:"เล่าเรื่อง",scene:"A friendly chat about yesterday, last weekend and future plans.",
+  items:[["Yesterday I went to work.","เมื่อวานผมไปทำงาน"],["Last weekend I visited my family.","สุดสัปดาห์ที่แล้วผมไปเยี่ยมครอบครัว"],["I'm going to travel to Japan.","ผมจะไปเที่ยวญี่ปุ่น"],["I want to learn English.","ผมอยากเรียนภาษาอังกฤษ"]]},
+ {id:5,icon:"🔧",name:"เรื่องงาน",scene:"A foreign visitor is curious about the learner's job maintaining railway signals and level crossing barriers. Ask simple questions about the work.",
+  items:[["My job is signal maintenance.","งานของผมคือซ่อมบำรุงระบบอาณัติสัญญาณ"],["Today I checked the crossing.","วันนี้ผมตรวจทางข้าม"],["There is a problem with the signal.","สัญญาณมีปัญหา"],["The barrier is broken.","เครื่องกั้นเสีย"]]}
+];
+/* ========== state ========== */
+const $=s=>document.querySelector(s);
+const LS={get(k,d){try{const v=localStorage.getItem('sb_'+k);return v?JSON.parse(v):d}catch(e){return d}},set(k,v){try{localStorage.setItem('sb_'+k,JSON.stringify(v))}catch(e){}}};
+const S={tab:'learn',cfg:LS.get('cfg',{key:'',model:'gemini-3.8-flash',name:'Pati',rate:0.85}),prog:LS.get('prog',{}),rev:LS.get('rev',[]),
+ days:LS.get('days',[]),view:null,lvl:null,idx:0,chat:[],busy:false,rec:null};
+const T=(s)=>s.replace('{name}',S.cfg.name||'Pati');
+function save(){LS.set('cfg',S.cfg);LS.set('prog',S.prog);LS.set('rev',S.rev);LS.set('days',S.days)}
+function esc(s){return String(s==null?'':s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]))}
+function today(){return new Date().toISOString().slice(0,10)}
+function markDay(){const d=today();if(!S.days.includes(d)){S.days.push(d);save()}}
+function streak(){let n=0,dt=new Date();const set=new Set(S.days);for(;;){const k=dt.toISOString().slice(0,10);if(set.has(k)){n++;dt.setDate(dt.getDate()-1)}else if(n===0&&k===today()){dt.setDate(dt.getDate()-1)}else break}return n}
+
+/* ========== เสียงพูด (TTS) ========== */
+let voice=null;
+function pickVoice(){const vs=speechSynthesis.getVoices().filter(v=>/^en[-_]US/i.test(v.lang));
+ const pref=['Samantha','Ava','Allison','Nicky','Aaron','Google US English'];
+ voice=null;for(const p of pref){voice=vs.find(v=>v.name.includes(p));if(voice)break}
+ if(!voice)voice=vs[0]||speechSynthesis.getVoices().find(v=>/^en/i.test(v.lang))||null}
+if('speechSynthesis' in window){speechSynthesis.onvoiceschanged=pickVoice;pickVoice()}
+function say(text,slow){return new Promise(res=>{if(!('speechSynthesis' in window))return res();
+ speechSynthesis.cancel();const u=new SpeechSynthesisUtterance(text);u.lang='en-US';if(voice)u.voice=voice;
+ u.rate=slow?Math.max(.45,S.cfg.rate-.3):S.cfg.rate;u.onend=res;u.onerror=res;speechSynthesis.speak(u)})}
+function unlockTTS(){try{const u=new SpeechSynthesisUtterance(' ');u.volume=0;speechSynthesis.speak(u)}catch(e){}}
+
+/* ========== อัดเสียง → WAV 16k ========== */
+async function startRec(){
+ const stream=await navigator.mediaDevices.getUserMedia({audio:{echoCancellation:true,noiseSuppression:true}});
+ const mt=['audio/mp4','audio/webm;codecs=opus','audio/webm'].find(t=>window.MediaRecorder&&MediaRecorder.isTypeSupported(t))||'';
+ const mr=new MediaRecorder(stream,mt?{mimeType:mt}:{});const chunks=[];
+ mr.ondataavailable=e=>e.data&&e.data.size&&chunks.push(e.data);
+ const done=new Promise(r=>{mr.onstop=()=>{stream.getTracks().forEach(t=>t.stop());r(new Blob(chunks,{type:mr.mimeType||mt||'audio/mp4'}))}});
+ mr.start();return {stop(){mr.stop();return done}}}
+async function toWav(blob){
+ const buf=await blob.arrayBuffer();const AC=window.AudioContext||window.webkitAudioContext;const ac=new AC();
+ const dec=await new Promise((ok,no)=>ac.decodeAudioData(buf,ok,no));ac.close&&ac.close();
+ const len=Math.ceil(dec.duration*16000);const oc=new (window.OfflineAudioContext||window.webkitOfflineAudioContext)(1,len,16000);
+ const src=oc.createBufferSource();src.buffer=dec;src.connect(oc.destination);src.start();
+ const out=await new Promise((ok,no)=>{const p=oc.startRendering();p.then?p.then(ok,no):oc.oncomplete=e=>ok(e.renderedBuffer)});
+ const d=out.getChannelData(0);const w=new DataView(new ArrayBuffer(44+d.length*2));
+ const ws=(o,s)=>{for(let i=0;i<s.length;i++)w.setUint8(o+i,s.charCodeAt(i))};
+ ws(0,'RIFF');w.setUint32(4,36+d.length*2,true);ws(8,'WAVE');ws(12,'fmt ');w.setUint32(16,16,true);w.setUint16(20,1,true);w.setUint16(22,1,true);
+ w.setUint32(24,16000,true);w.setUint32(28,32000,true);w.setUint16(32,2,true);w.setUint16(34,16,true);ws(36,'data');w.setUint32(40,d.length*2,true);
+ for(let i=0;i<d.length;i++){const x=Math.max(-1,Math.min(1,d[i]));w.setInt16(44+i*2,x<0?x*0x8000:x*0x7fff,true)}
+ return new Blob([w.buffer],{type:'audio/wav'})}
+function b64(blob){return new Promise(r=>{const f=new FileReader();f.onload=()=>r(String(f.result).split(',')[1]);f.readAsDataURL(blob)})}
+async function audioPart(blob){let b=blob,mt=(blob.type||'audio/mp4').split(';')[0];
+ try{b=await toWav(blob);mt='audio/wav'}catch(e){}
+ return {inlineData:{mimeType:mt,data:await b64(b)}}}
+
+/* ========== Gemini ========== */
+async function gem(system,contents){
+ if(!S.cfg.key)throw new Error('ยังไม่ได้ใส่ API key — ไปที่แท็บ ⚙️ ตั้งค่า');
+ const url='https://generativelanguage.googleapis.com/v1beta/models/'+encodeURIComponent(S.cfg.model)+':generateContent?key='+encodeURIComponent(S.cfg.key);
+ const r=await fetch(url,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({
+  systemInstruction:{parts:[{text:system}]},contents,generationConfig:{responseMimeType:'application/json',temperature:0.5}})});
+ const j=await r.json();
+ if(!r.ok){const m=(j.error&&j.error.message)||('HTTP '+r.status);throw new Error(r.status===429?'ใช้โควตาครบแล้ว ลองเปลี่ยนเป็นรุ่น flash-lite ในตั้งค่า ('+m+')':m)}
+ const t=(j.candidates&&j.candidates[0]&&j.candidates[0].content&&j.candidates[0].content.parts||[]).map(p=>p.text||'').join('');
+ try{return JSON.parse(t.replace(/^```json\s*|```$/g,'').trim())}catch(e){throw new Error('AI ตอบรูปแบบผิด ลองใหม่อีกครั้ง')}}
+
+const SYS_DRILL=`You are a kind English pronunciation coach for a Thai beginner. The learner will say the TARGET sentence. Listen to the audio and compare.
+Return JSON: {"heard":"what the learner actually said, in English words as heard","score":0-100 integer for how close it is to the target (meaning and clear words matter more than accent),"ok":true if score>=70,"tip_th":"ONE short tip in Thai (max 25 words) about the single most important word to fix, or praise if ok"}.
+If the audio is silent or unclear, score 0 and ask to try again in tip_th.`;
+async function judge(target,blob){
+ const p=await audioPart(blob);
+ return gem(SYS_DRILL,[{role:'user',parts:[{text:'TARGET: '+target},p]}])}
+
+function sysChat(lv){return `You are "Teacher Emma", a warm, patient native English speaker teaching a Thai adult beginner, one-to-one, by voice.
+Learner: ${S.cfg.name||'Pati'}. Level: beginner. Can understand slow simple English but only speaks single words or very short phrases.
+Role-play scene: ${lv.scene}
+Rules: speak very simply, 1-2 SHORT sentences, ask only ONE question at a time, never use lists or emojis. Stay in the scene and play the other person naturally. Encourage the learner to speak in full sentences.
+Target patterns for this level: ${lv.items.map(i=>T(i[0])).join(' | ')}.
+Return JSON only: {"heard":"transcription of what the learner said (empty string if no learner turn yet)","reply":"your spoken reply in English","better":"if the learner's sentence had a mistake or was only a word/phrase, the natural full sentence a native would say; otherwise empty string","note_th":"one short Thai tip explaining the fix (max 25 words) or empty string","hint":"a simple English sentence the learner could say next to answer your question"}.`}
+
+/* ========== UI ========== */
+function render(){
+ $('#streak').textContent=streak()?('🔥 '+streak()+' วัน'):'';
+ $('#nav').innerHTML=[['learn','📚','เรียน'],['talk','💬','คุยกับครู'],['review','🔁','ทบทวน'],['set','⚙️','ตั้งค่า']]
+  .map(t=>`<button class="${S.tab===t[0]?'on':''}" onclick="go('${t[0]}')"><span>${t[1]}</span>${t[2]}</button>`).join('');
+ $('#bar').innerHTML='';
+ ({learn:vLearn,talk:vTalk,review:vReview,set:vSet})[S.tab]();}
+function go(t){speechSynthesis&&speechSynthesis.cancel();S.tab=t;S.view=null;S.lvl=null;render()}
+function doneCount(id){return (S.prog[id]||[]).filter(Boolean).length}
+function dueItems(){const t=today();return S.rev.filter(x=>x.due<=t)}
+
+/* ---- เรียน ---- */
+function vLearn(){
+ $('#sub').textContent='ฝึกพูดทีละประโยค';
+ if(S.view==='drill')return vDrill();
+ const due=dueItems().length;
+ $('#main').innerHTML=(due?`<div class="card" onclick="go('review')" style="background:#fff4d6;cursor:pointer">🔁 มี <b>${due}</b> ประโยคที่ถึงเวลาทบทวน แตะเพื่อเริ่ม</div>`:'')+
+ LEVELS.map(l=>`<div class="card lv" onclick="openLvl(${l.id})"><div class="n">${l.icon}</div><div><b>ด่าน ${l.id}: ${l.name}</b><div class="d">${T(l.items[0][0])} …</div></div><div class="st">${doneCount(l.id)}/4 ✓</div></div>`).join('');
+}
+function openLvl(id){S.lvl=LEVELS.find(l=>l.id===id);S.idx=0;S.view='drill';S.res=null;render()}
+function vDrill(){
+ const l=S.lvl,it=l.items[S.idx],en=T(it[0]),th=T(it[1]);
+ $('#sub').textContent='ด่าน '+l.id+' · '+l.name;
+ $('#main').innerHTML=`<button class="back" onclick="S.view=null;render()">‹ กลับ</button>
+ <div class="card center"><span class="pill">ประโยคที่ ${S.idx+1}/4</span>
+ <div class="big" style="margin-top:12px">${esc(en)}</div><div class="th">${esc(th)}</div>
+ <div class="row" style="justify-content:center"><button class="btn" onclick="say(${JSON.stringify(en).replace(/"/g,'&quot;')})">🔊 ฟัง</button><button class="btn" onclick="say(${JSON.stringify(en).replace(/"/g,'&quot;')},true)">🐢 ช้า</button></div></div>
+ <div class="center" style="margin:18px 0"><button class="mic" id="mic" onclick="micDrill()">🎤</button><div class="th" id="mst">แตะไมค์ แล้วพูดตามครู แตะอีกครั้งเพื่อหยุด</div></div>
+ <div id="res"></div>
+ <div class="row" style="justify-content:space-between"><button class="btn" ${S.idx===0?'disabled':''} onclick="S.idx--;render()">‹ ก่อนหน้า</button>
+ <button class="btn pri" onclick="nextDrill()">${S.idx===3?'จบด่าน':'ถัดไป ›'}</button></div>
+ ${S.idx===3?`<div class="card" style="margin-top:14px"><b>พร้อมแล้ว?</b><div class="th">ลองใช้ประโยคเหล่านี้คุยจริงกับครู</div><div class="row"><button class="btn pri" onclick="startTalk(${l.id})">💬 role-play ด่านนี้</button></div></div>`:''}`;
+ if(S.res)showRes(S.res)}
+function nextDrill(){if(S.idx<3){S.idx++;S.res=null;render()}else{S.view=null;render()}}
+async function micDrill(){
+ const b=$('#mic');
+ if(S.rec){const r=S.rec;S.rec=null;b.classList.remove('rec');b.disabled=true;$('#mst').innerHTML='<span class="spin"></span>กำลังฟัง…';
+  try{const blob=await r.stop();const en=T(S.lvl.items[S.idx][0]);const j=await judge(en,blob);S.res=j;
+   const p=S.prog[S.lvl.id]||[false,false,false,false];
+   if(j.ok){p[S.idx]=true;S.prog[S.lvl.id]=p;markDay()}else addReview(en,T(S.lvl.items[S.idx][1]));
+   save();render()}catch(e){b.disabled=false;$('#mst').innerHTML='<span class="err">'+esc(e.message)+'</span>'}return}
+ unlockTTS();speechSynthesis.cancel();
+ try{S.rec=await startRec();b.classList.add('rec');$('#mst').textContent='กำลังฟังอยู่… พูดได้เลย'}catch(e){$('#mst').innerHTML='<span class="err">เปิดไมค์ไม่ได้ — อนุญาตไมโครโฟนให้ Safari/แอปนี้ก่อน</span>'}}
+function showRes(j){const el=$('#res');if(!el)return;
+ el.innerHTML=`<div class="res ${j.ok?'good':'no'}"><b>${j.ok?'✅ ดีมาก':'🔁 ลองอีกครั้ง'} · ${esc(j.score)}/100</b><div style="margin:6px 0">ได้ยินว่า: <i>${esc(j.heard)}</i></div><div>${esc(j.tip_th)}</div></div>`}
+
+/* ---- ทบทวน (Leitner) ---- */
+const BOX=[0,1,2,4,7,14];
+function addReview(en,th){if(!S.rev.find(x=>x.en===en)){const d=new Date();d.setDate(d.getDate()+1);S.rev.push({en,th,box:1,due:d.toISOString().slice(0,10)});save()}}
+function vReview(){
+ $('#sub').textContent='ทบทวนประโยคที่เคยพลาด';
+ const due=dueItems();
+ if(!S.rev.length){$('#main').innerHTML='<div class="card center">ยังไม่มีประโยคให้ทบทวน<div class="th">ประโยคที่พูดยังไม่ผ่าน หรือที่ครูแก้ให้ จะมาอยู่ที่นี่</div></div>';return}
+ if(!due.length){$('#main').innerHTML=`<div class="card center">🎉 วันนี้ทบทวนครบแล้ว<div class="th">ยังเหลือในคลัง ${S.rev.length} ประโยค</div></div>`;return}
+ const it=due[0];S.cur=it;
+ $('#main').innerHTML=`<div class="card center"><span class="pill">ค้างอยู่ ${due.length} ประโยค</span>
+ <div class="th" style="margin-top:14px">พูดประโยคนี้เป็นภาษาอังกฤษ</div><div class="big">${esc(it.th)}</div>
+ <div class="row" style="justify-content:center"><button class="btn" id="peek" onclick="peek()">👀 ดูเฉลย</button></div><div id="ans"></div></div>
+ <div class="center" style="margin:18px 0"><button class="mic" id="mic" onclick="micRev()">🎤</button><div class="th" id="mst">แตะไมค์แล้วพูด</div></div><div id="res"></div>`}
+function peek(){$('#ans').innerHTML=`<div class="big" style="margin-top:12px">${esc(S.cur.en)}</div><div class="row" style="justify-content:center"><button class="btn" onclick="say(S.cur.en)">🔊</button><button class="btn" onclick="say(S.cur.en,true)">🐢</button></div>`}
+function rate(ok){const it=S.cur;it.box=ok?Math.min(5,it.box+1):1;const d=new Date();d.setDate(d.getDate()+BOX[it.box]);it.due=d.toISOString().slice(0,10);
+ if(ok&&it.box>=5&&false){} markDay();save();render()}
+async function micRev(){
+ const b=$('#mic');
+ if(S.rec){const r=S.rec;S.rec=null;b.classList.remove('rec');b.disabled=true;$('#mst').innerHTML='<span class="spin"></span>กำลังฟัง…';
+  try{const blob=await r.stop();const j=await judge(S.cur.en,blob);peek();showRes(j);b.disabled=false;$('#mst').innerHTML=`<div class="row" style="justify-content:center"><button class="btn ok" onclick="rate(true)">จำได้ ›</button><button class="btn bad" onclick="rate(false)">ยังไม่แม่น ›</button></div>`}
+  catch(e){b.disabled=false;$('#mst').innerHTML='<span class="err">'+esc(e.message)+'</span>'}return}
+ unlockTTS();try{S.rec=await startRec();b.classList.add('rec');$('#mst').textContent='กำลังฟังอยู่…'}catch(e){$('#mst').innerHTML='<span class="err">เปิดไมค์ไม่ได้</span>'}}
+
+/* ---- คุยกับครู ---- */
+function startTalk(id){S.tab='talk';S.view='chat';S.lvl=LEVELS.find(l=>l.id===id);S.chat=[];render();teacherTurn(null)}
+function vTalk(){
+ if(S.view!=='chat'){$('#sub').textContent='เลือกสถานการณ์';
+  $('#main').innerHTML='<div class="th" style="margin:0 4px 10px">ครูจะเล่นบทตามสถานการณ์ พูดช้า ๆ และช่วยแก้ประโยคให้</div>'+
+  LEVELS.map(l=>`<div class="card lv" onclick="startTalk(${l.id})"><div class="n">${l.icon}</div><div><b>${l.name}</b><div class="d">${l.scene.split('.')[0]}</div></div></div>`).join('');return}
+ $('#sub').textContent=S.lvl.name;
+ $('#main').innerHTML=`<button class="back" onclick="S.view=null;speechSynthesis.cancel();render()">‹ เลือกสถานการณ์ใหม่</button><div id="log"></div>`;
+ $('#bar').innerHTML=`<button class="mic" id="mic" style="width:54px;height:54px;font-size:24px" onclick="micChat()">🎤</button><input type="text" id="txt" placeholder="หรือพิมพ์ภาษาอังกฤษ…" onkeydown="if(event.key==='Enter')sendTxt()"><button class="btn pri" onclick="sendTxt()">ส่ง</button>`;
+ drawChat()}
+function drawChat(){const el=$('#log');if(!el)return;
+ el.innerHTML=S.chat.map((m,i)=>{
+  if(m.r==='u')return `<div class="bub u">${esc(m.text)}</div>`+(m.better?`<div class="fix" style="margin-left:auto"><b>👩‍🏫 เจ้าของภาษาจะพูดว่า</b>${esc(m.better)}<div style="margin-top:4px;color:#555">${esc(m.note)}</div><div class="row" style="margin-top:6px"><button class="btn" onclick="say(S.chat[${i}].better)">🔊</button><button class="btn" onclick="saveFix(${i})">⭐ เก็บไว้ทบทวน</button></div></div>`:'');
+  return `<div class="bub t">${esc(m.text)} <button class="btn" style="padding:3px 9px;margin-left:4px" onclick="say(S.chat[${i}].text)">🔊</button></div>`+(m.hint?`<div class="hint">💡 ตอบได้ว่า: <u onclick="say(S.chat[${i}].hint)">${esc(m.hint)}</u> 🔊</div>`:'')}).join('')+(S.busy?'<div class="th"><span class="spin"></span>ครูกำลังคิด…</div>':'');
+ const m=$('#main');m.scrollTop=m.scrollHeight}
+function saveFix(i){const m=S.chat[i];addReview(m.better,m.note||m.text);m.saved=true;alert('เก็บไว้ในแท็บทบทวนแล้ว')}
+async function teacherTurn(audio,text){
+ S.busy=true;drawChat();
+ const hist=S.chat.map(m=>({role:m.r==='u'?'user':'model',parts:[{text:m.r==='u'?m.text:JSON.stringify({reply:m.text})}]}));
+ const parts=audio?[{text:'(Learner speaks:)'},audio]:[{text:text||'Begin the role-play now: greet the learner and ask the first simple question.'}];
+ try{const j=await gem(sysChat(S.lvl),hist.concat([{role:'user',parts}]));
+  if(audio||text){S.chat.push({r:'u',text:j.heard||text||'…',better:j.better||'',note:j.note_th||''});}
+  S.chat.push({r:'t',text:j.reply||'',hint:j.hint||''});markDay();S.busy=false;drawChat();say(j.reply||'')}
+ catch(e){S.busy=false;drawChat();const el=$('#log');if(el)el.insertAdjacentHTML('beforeend','<div class="err">'+esc(e.message)+'</div>')}}
+async function micChat(){
+ if(S.busy)return;const b=$('#mic');
+ if(S.rec){const r=S.rec;S.rec=null;b.classList.remove('rec');const blob=await r.stop();const a=await audioPart(blob);teacherTurn(a);return}
+ unlockTTS();speechSynthesis.cancel();try{S.rec=await startRec();b.classList.add('rec')}catch(e){alert('เปิดไมค์ไม่ได้ — อนุญาตไมโครโฟนก่อน')}}
+function sendTxt(){const i=$('#txt');const v=i.value.trim();if(!v||S.busy)return;i.value='';unlockTTS();teacherTurn(null,'(Learner types:) '+v)}
+
+/* ---- ตั้งค่า ---- */
+function vSet(){
+ $('#sub').textContent='ตั้งค่า';
+ $('#main').innerHTML=`<div class="card"><label style="margin-top:0">ชื่อของคุณ (ครูจะเรียกชื่อนี้)</label><input type="text" id="c_name" value="${esc(S.cfg.name)}">
+ <label>Gemini API key</label><input type="password" id="c_key" value="${esc(S.cfg.key)}" placeholder="วาง API key ที่นี่">
+ <label>โมเดล</label><input type="text" id="c_model" value="${esc(S.cfg.model)}">
+ <div class="th" style="font-size:13px">ถ้าช้าหรือโควตาหมด เปลี่ยนเป็น gemini-3.5-flash-lite</div>
+ <label>ความเร็วเสียงครู: <span id="rv">${S.cfg.rate}</span></label><input type="range" id="c_rate" min="0.5" max="1.1" step="0.05" value="${S.cfg.rate}" oninput="$('#rv').textContent=this.value" style="width:100%">
+ <div class="row"><button class="btn pri" onclick="saveCfg()">บันทึก & ทดสอบ</button><button class="btn" onclick="say('Hello! I am Teacher Emma. Nice to meet you.')">🔊 ลองเสียงครู</button></div><div id="cst"></div></div>
+ <div class="card"><b>สถิติ</b><div class="th">ฝึกมาแล้ว ${S.days.length} วัน · ทำผ่าน ${Object.values(S.prog).reduce((a,p)=>a+p.filter(Boolean).length,0)}/20 ประโยค · คลังทบทวน ${S.rev.length} ประโยค</div></div>
+ <div class="th" style="font-size:13px;padding:0 4px">API key เก็บอยู่ในเครื่องนี้เท่านั้น ห้ามใส่ลงไฟล์บน GitHub</div>`}
+async function saveCfg(){
+ S.cfg={key:$('#c_key').value.trim(),model:$('#c_model').value.trim()||'gemini-3.8-flash',name:$('#c_name').value.trim()||'Pati',rate:parseFloat($('#c_rate').value)};save();
+ $('#cst').innerHTML='<div class="th"><span class="spin"></span>กำลังทดสอบ…</div>';
+ try{const j=await gem('Reply with JSON {"ok":true}',[{role:'user',parts:[{text:'ping'}]}]);$('#cst').innerHTML='<div style="color:var(--ok);margin-top:8px">✅ เชื่อมต่อสำเร็จ</div>'}
+ catch(e){$('#cst').innerHTML='<div class="err">'+esc(e.message)+'</div>'}}
+
+if('serviceWorker' in navigator)navigator.serviceWorker.register('sw.js').catch(()=>{});
+render();
+if(!S.cfg.key){S.tab='set';render()}
+</script>
+</body>
+</html>
