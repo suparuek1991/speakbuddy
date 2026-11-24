@@ -126,7 +126,9 @@ async function toWav(blob){
  for(let i=0;i<d.length;i++){const x=Math.max(-1,Math.min(1,d[i]));w.setInt16(44+i*2,x<0?x*0x8000:x*0x7fff,true)}
  return new Blob([w.buffer],{type:'audio/wav'})}
 function b64(blob){return new Promise(r=>{const f=new FileReader();f.onload=()=>r(String(f.result).split(',')[1]);f.readAsDataURL(blob)})}
-async function audioPart(blob){let b=blob,mt=(blob.type||'audio/mp4').split(';')[0];
+async function audioPart(blob){
+ if(!blob||blob.size<1500)throw new Error('บันทึกเสียงไม่ติดหรือสั้นเกินไป กดไมค์ให้เป็นสีแดง พูดอย่างน้อย 1-2 วินาที แล้วกดหยุด');
+ let b=blob,mt=(blob.type||'audio/mp4').split(';')[0];
  try{b=await Promise.race([toWav(blob),new Promise((_,no)=>setTimeout(()=>no(new Error('wav timeout')),6000))]);mt='audio/wav'}catch(e){b=blob;mt=(blob.type||'audio/mp4').split(';')[0]}
  return {inlineData:{mimeType:mt,data:await b64(b)}}}
 function setMst(h){const e=document.querySelector('#mst');if(e)e.innerHTML=h}
@@ -263,7 +265,9 @@ async function teacherTurn(audio,text){
  catch(e){S.busy=false;drawChat();const el=$('#log');if(el)el.insertAdjacentHTML('beforeend','<div class="err">'+esc(e.message)+'</div>')}}
 async function micChat(){
  if(S.busy)return;const b=$('#mic');
- if(S.rec){const r=S.rec;S.rec=null;b.classList.remove('rec');const blob=await r.stop();const a=await audioPart(blob);teacherTurn(a);return}
+ if(S.rec){const r=S.rec;S.rec=null;b.classList.remove('rec');
+  try{const blob=await r.stop();const a=await audioPart(blob);teacherTurn(a)}
+  catch(e){const el=$('#log');if(el)el.insertAdjacentHTML('beforeend','<div class="err">'+esc(e.message)+'</div>')}return}
  unlockTTS();speechSynthesis.cancel();try{S.rec=await startRec();b.classList.add('rec')}catch(e){alert('เปิดไมค์ไม่ได้ — อนุญาตไมโครโฟนก่อน')}}
 function sendTxt(){const i=$('#txt');const v=i.value.trim();if(!v||S.busy)return;i.value='';unlockTTS();teacherTurn(null,'(Learner types:) '+v)}
 
